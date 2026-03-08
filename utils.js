@@ -5,6 +5,7 @@ const Utils = {
     return outMin + ((value - inMin) / (inMax - inMin)) * (outMax - outMin);
   },
   clamp(value, min, max) { return Math.max(min, Math.min(max, value)); },
+
   hsvToRgb(h, s, v) {
     h = ((h % 360) + 360) % 360;
     const c = v * s;
@@ -22,6 +23,23 @@ const Utils = {
       g: Math.round((g + m) * 255),
       b: Math.round((b + m) * 255),
     };
+  },
+
+  rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    const s = max === 0 ? 0 : d / max;
+    const v = max;
+
+    if (max !== min) {
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+      else if (max === g) h = ((b - r) / d + 2) / 6;
+      else h = ((r - g) / d + 4) / 6;
+    }
+    return { h: h * 360, s: s, v: v };
   },
   createPaletteFromHue(hueBase, paletteMode, count) {
     count = count || 6;

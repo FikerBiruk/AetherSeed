@@ -70,6 +70,39 @@ class InteractionManager {
         case 'S':
           self.app.screenshot();
           break;
+        case 'a':
+        case 'A':
+          if (self.app.scene) {
+            const cx = self.app.canvas.width / 2;
+            const cy = self.app.canvas.height / 2;
+            self.app.scene.addAttractor(cx, cy, 5000);
+          }
+          break;
+        case 'c':
+        case 'C':
+          if (self.app.scene) {
+            const speed = self.app.scene.colorShiftSpeed === 0 ? 30 : 0;
+            self.app.scene.setColorShift(speed);
+          }
+          break;
+        case 'p':
+        case 'P':
+          if (self.app.scene) {
+            self.app.scene.setPerformanceMode(!self.app.scene.performanceMode);
+          }
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          if (self.app.scene && self.app.scene.entities.length < 500) {
+            for (let i = 0; i < 10; i++) self.app.scene._spawnEntity();
+          }
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          if (self.app.scene && self.app.scene.entities.length > 10) {
+            self.app.scene.entities.splice(0, 10);
+          }
+          break;
       }
     });
   }

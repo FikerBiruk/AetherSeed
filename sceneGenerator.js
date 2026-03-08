@@ -15,6 +15,12 @@ class SceneGenerator {
     this.distortionBoost = 0;
     this.palette = Utils.createPaletteFromHue(this.params.hueBase, this.params.paletteMode, 8);
 
+    // NEW: Attractors and layers
+    this.attractors = [];
+    this.layers = 3; // depth layers
+    this.colorShiftSpeed = 0;
+    this.performanceMode = false;
+
     this._spawnInitial();
   }
 
@@ -30,9 +36,10 @@ class SceneGenerator {
     const p = this.params;
     const s = this.seed;
 
-    // Position
+    // Position with depth
     const px = x !== undefined ? x : s.randomFloat(0, this.w);
     const py = y !== undefined ? y : s.randomFloat(0, this.h);
+    const pz = s.randomFloat(0, this.layers); // depth layer
 
     // Velocity based on motionStyle
     let vx = 0, vy = 0;
@@ -73,24 +80,40 @@ class SceneGenerator {
       vy = Math.sin(a) * sp;
     }
 
-    const baseShape = burst ? s.randomInt(0, 5) : p.shapeStyle;
+    // Enhanced shape selection with new types
+    const baseShape = burst ? s.randomInt(0, 10) : (p.shapeStyle > 5 ? s.randomInt(0, 10) : p.shapeStyle);
     const size = s.randomFloat(3, 18 + p.density * 30);
+
+    // Depth-based scaling
+    const depthScale = 0.3 + (pz / this.layers) * 0.7;
+    const actualSize = size * depthScale;
+
+    // Random color with hue
+    const colorIndex = s.randomInt(0, this.palette.length - 1);
+    const rgb = this.palette[colorIndex].match(/\d+/g);
+    const hue = rgb ? Utils.rgbToHsv(parseInt(rgb[0]), parseInt(rgb[1]), parseInt(rgb[2])).h : s.randomFloat(0, 360);
 
     const entity = new VisualElement({
       x: px,
       y: py,
+      z: pz,
       vx: vx,
       vy: vy,
-      size: size,
+      vz: 0,
+      size: actualSize,
       color: s.choose(this.palette),
       shapeType: baseShape,
-      alpha: s.randomFloat(0.15, 0.7),
+      alpha: s.randomFloat(0.15, 0.7) * depthScale,
       distortionFactor: p.distortion + this.distortionBoost,
       growthFactor: p.growthRate,
       rotation: s.randomFloat(0, Math.PI * 2),
       rotationSpeed: s.randomFloat(-1.5, 1.5),
       maxAge: burst ? s.randomFloat(1.5, 4) : Infinity,
       phase: s.randomFloat(0, 100),
+      mass: size * 0.1,
+      enableTrail: baseShape === 10 || (p.mood > 0.7 && s.randomFloat(0, 1) > 0.7),
+      hue: hue,
+      hueShift: this.colorShiftSpeed,
     });
 
     this.entities.push(entity);
@@ -107,16 +130,41 @@ class SceneGenerator {
     this.distortionBoost = val;
   }
 
+  // NEW: Attractor management
+  addAttractor(x, y, strength) {
+    this.attractors.push({ x, y, strength, life: 3.0 });
+  }
+
+  setColorShift(speed) {
+    this.colorShiftSpeed = speed;
+    this.entities.forEach(e => e.hueShift = speed);
+  }
+
+  setPerformanceMode(enabled) {
+    this.performanceMode = enabled;
+  }
+
   burst(x, y) {
-    const count = 8 + Math.floor(this.params.mood * 20);
+    const count = this.performanceMode ? 5 : 8 + Math.floor(this.params.mood * 20);
     for (let i = 0; i < count; i++) {
       this._spawnEntity(x, y, true);
     }
+    // Add temporary attractor at burst point
+    this.addAttractor(x, y, -2000);
   }
 
   update(dt) {
     this.time += dt;
     const p = this.params;
+
+    // Update attractors
+    for (let i = this.attractors.length - 1; i >= 0; i--) {
+      this.attractors[i].life -= dt;
+      this.attractors[i].strength *= 0.98; // decay
+      if (this.attractors[i].life <= 0) {
+        this.attractors.splice(i, 1);
+      }
+    }
 
     // Motion style: orbit needs special handling
     for (let i = this.entities.length - 1; i >= 0; i--) {
@@ -148,7 +196,7 @@ class SceneGenerator {
       // Update distortion factor to include boost
       e.distortionFactor = p.distortion + this.distortionBoost;
 
-      e.update(dt, this.seed, this.time, this.wind);
+      e.update(dt, this.seed, this.time, this.wind, this.attractors);
 
       // Wrap around edges
       if (e.maxAge === Infinity) {
@@ -164,8 +212,11 @@ class SceneGenerator {
       }
     }
 
+    // Sort by depth for proper layering
+    this.entities.sort((a, b) => a.z - b.z);
+
     // Mood-based spawn/despawn
-    const targetCount = Math.floor(30 + p.density * 120);
+    const targetCount = this.performanceMode ? 50 : Math.floor(30 + p.density * 120);
     if (this.entities.length < targetCount * 0.8 && Math.random() < 0.1) {
       this._spawnEntity();
     }

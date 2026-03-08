@@ -16,6 +16,9 @@
   const audioToggle = document.getElementById('audio-toggle');
   const audioOnIcon = document.getElementById('audio-on-icon');
   const audioOffIcon = document.getElementById('audio-off-icon');
+  const statsDisplay = document.getElementById('stats-display');
+  const fpsCounter = document.getElementById('fps-counter');
+  const particleCounter = document.getElementById('particle-counter');
 
   /* ---- App state ---- */
   const app = {
@@ -28,6 +31,9 @@
     mutationIndex: 0,
     lastTime: 0,
     bgColor: { r: 8, g: 8, b: 12 },
+    frameCount: 0,
+    fpsTime: 0,
+    fps: 0,
   };
 
   /* ---- Canvas sizing ---- */
@@ -90,6 +96,7 @@
     // Show seed label
     seedLabel.textContent = word;
     seedDisplay.classList.remove('hidden');
+    statsDisplay.classList.remove('hidden');
 
     // Hide overlay
     overlay.classList.add('hidden');
@@ -103,6 +110,13 @@
     audioOnIcon.classList.remove('hidden');
     audioOffIcon.classList.add('hidden');
 
+    // Update URL with seed
+    if (window.history && window.history.pushState) {
+      const url = new URL(window.location);
+      url.searchParams.set('seed', word);
+      window.history.pushState({}, '', url);
+    }
+
     if (!app.running) {
       app.running = true;
       app.lastTime = performance.now();
@@ -114,6 +128,21 @@
   function loop(now) {
     const dt = Math.min((now - app.lastTime) / 1000, 0.1);
     app.lastTime = now;
+
+    // FPS calculation
+    app.frameCount++;
+    app.fpsTime += dt;
+    if (app.fpsTime >= 1.0) {
+      app.fps = Math.round(app.frameCount / app.fpsTime);
+      app.frameCount = 0;
+      app.fpsTime = 0;
+
+      // Update stats display
+      if (app.scene) {
+        fpsCounter.textContent = 'FPS: ' + app.fps;
+        particleCounter.textContent = 'Particles: ' + app.scene.entities.length;
+      }
+    }
 
     if (app.scene) {
       // Fade trail
@@ -190,6 +219,16 @@
     audioOnIcon.classList.toggle('hidden');
     audioOffIcon.classList.toggle('hidden');
   });
+
+  /* ---- Load seed from URL ---- */
+  (function loadFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const seed = params.get('seed');
+    if (seed) {
+      seedInput.value = seed;
+      startScene(seed);
+    }
+  })();
 
 })();
 
